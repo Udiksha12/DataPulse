@@ -1,0 +1,5 @@
+record_id,email,attendance_pct,department
+R001,ananya@example.edu,92,CSE
+R002,not-an-email,88,SCOPE
+R002,anoop@example.edu,110,CSE
+R004,,76,SCOPE
