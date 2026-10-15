@@ -11,6 +11,16 @@ export default function BakyaAdminPage({ token, onOpenDataset }) {
 
   if (error) return <div role="alert" className="notice notice-error">{error}</div>;
   if (!summary) return <div className="loading-state">Loading administration overview…</div>;
+  const supportUpdates = (summary.recentAuditLogs || [])
+    .filter((log) => log.action === 'SUPPORT_TEAM_NOTIFIED')
+    .map((log) => ({
+      ...log,
+      logId: log.logId ?? log.log_id,
+      entityId: log.entityId ?? log.entity_id,
+      actorUserId: log.actorUserId ?? log.actor_user_id,
+      newValues: log.newValues ?? log.new_values,
+      createdAt: log.createdAt ?? log.created_at,
+    }));
 
   return (
     <div className="page-stack">
@@ -27,6 +37,9 @@ export default function BakyaAdminPage({ token, onOpenDataset }) {
           <td>{dataset.latestOverallScore == null ? 'No run' : `${Number(dataset.latestOverallScore).toFixed(1)}%`}</td><td>{dataset.openIssueCount}</td>
           <td><button className="text-button" onClick={() => onOpenDataset(dataset.datasetId)}>Open →</button></td>
         </tr>)}</tbody></table></div>
+      </section>
+      <section className="panel"><div className="panel-heading"><div><h2>Development & production support</h2><p className="muted">In-app notifications created when an issue is resolved or reopened.</p></div><span className="count-tag">{supportUpdates.length} recent</span></div>
+        {!supportUpdates.length ? <div className="empty-state"><h3>No support updates yet</h3><p>Issue-resolution notes will appear here for the support team.</p></div> : <div className="support-update-list">{supportUpdates.map((log) => <article className="support-update" key={log.logId}><div className="support-update-head"><strong>Issue #{log.entityId} · {log.newValues?.status || 'Updated'}</strong><time>{log.createdAt ? new Date(log.createdAt).toLocaleString() : ''}</time></div><p>{log.newValues?.note || 'Issue status updated.'}</p><small>Notified in DataPulse · actor user #{log.actorUserId ?? 'system'}</small></article>)}</div>}
       </section>
     </div>
   );

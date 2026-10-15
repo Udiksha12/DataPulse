@@ -246,6 +246,13 @@ describe('DataPulse API Integration Test Suite', () => {
     const resolvedIssue = issues.content.find((issue) => issue.issueId === sampleIssueId);
     assert.equal(resolvedIssue.status, 'RESOLVED');
     assert.equal(resolvedIssue.resolutions[0].note, 'Corrected during demo review.');
+
+    const adminRes = await fetch(`${baseUrl}/admin/overview`, { headers: { Authorization: `Bearer ${adminToken}` } });
+    assert.equal(adminRes.status, 200);
+    const overview = await adminRes.json();
+    const supportNotice = overview.recentAuditLogs.find((log) => log.action === 'SUPPORT_TEAM_NOTIFIED');
+    assert.equal(supportNotice.entityId, sampleIssueId);
+    assert.equal(supportNotice.newValues.note, 'Corrected during demo review.');
   });
 
   test('14. Archived datasets can be restored', async () => {

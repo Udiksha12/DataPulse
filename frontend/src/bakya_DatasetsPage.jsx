@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { bakyaApi } from './bakya_api.js';
+import BakyaResolutionDialog from './bakya_ResolutionDialog.jsx';
 
 const INITIAL_PAGE_SIZE = 8;
 
@@ -118,6 +119,9 @@ function BakyaDatasetWorkspace({ token, initialDataset, onClose, onReload, onSel
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [resolutionTarget, setResolutionTarget] = useState(null);
+  const [resolutionBusy, setResolutionBusy] = useState(false);
+  const [resolutionError, setResolutionError] = useState('');
 
   useEffect(() => {
     bakyaApi.dataset(token, initialDataset.datasetId).then((fresh) => {
@@ -198,18 +202,21 @@ function BakyaDatasetWorkspace({ token, initialDataset, onClose, onReload, onSel
     finally { setSaving(false); }
   }
 
-  async function resolveIssue(issue, status) {
-    const note = window.prompt(status === 'RESOLVED' ? 'Briefly describe the resolution:' : 'Why are you changing this issue?');
-    if (!note?.trim()) return;
+  async function saveIssueResolution(note) {
+    if (!resolutionTarget) return false;
+    const { issue, status } = resolutionTarget;
+    setResolutionBusy(true); setResolutionError('');
     try {
-      await bakyaApi.updateIssue(token, issue.issueId, { status, note: note.trim() });
+      await bakyaApi.updateIssue(token, issue.issueId, { status, note });
       const [updated, issues] = await Promise.all([
         bakyaApi.run(token, issue.runId),
         bakyaApi.issues(token, issue.runId, { page: 0, size: 100 }),
       ]);
       setRunResult({ ...updated, issues: issues.content });
-      await onReload();
-    } catch (err) { setError(err.message); }
+      await Promise.all([refreshDataset(), onReload()]);
+      return true;
+    } catch (err) { setResolutionError(err.message); return false; }
+    finally { setResolutionBusy(false); }
   }
 
   async function refreshDataset() {
@@ -248,7 +255,8 @@ function BakyaDatasetWorkspace({ token, initialDataset, onClose, onReload, onSel
         <section className="sub-panel"><div className="panel-heading"><div><h3>Validation run history</h3><p className="muted">Each run is saved separately with its own score and issues.</p></div><span className="count-tag">{dataset.runs?.length || 0} runs</span></div>
           {!dataset.runs?.length ? <p className="small-note">No validation runs yet. Upload a CSV to create the first run.</p> : <div className="table-scroll"><table><thead><tr><th>Run</th><th>Started</th><th>Status</th><th>Rows</th><th>Issues</th><th>Score</th><th /></tr></thead><tbody>{dataset.runs.map((run) => <tr key={run.runId}><td>#{run.runId}</td><td>{run.startedAt ? new Date(run.startedAt).toLocaleString() : '—'}</td><td>{run.status}</td><td>{run.totalRows}</td><td>{run.issueCount}</td><td>{run.score ? `${Number(run.score.overallScore).toFixed(1)}%` : '—'}</td><td><button className="text-button" type="button" onClick={() => onSelectRun(run.runId)}>Open run →</button></td></tr>)}</tbody></table></div>}
         </section>
-        {runResult?.issues?.length > 0 && <section className="sub-panel issue-panel"><div className="panel-heading"><div><h3>Latest issues</h3><p className="muted">First 100 issues from this run.</p></div></div><IssueTable issues={runResult.issues} onResolve={resolveIssue} /></section>}
+        {runResult?.issues?.length > 0 && <section className="sub-panel issue-panel"><div className="panel-heading"><div><h3>Latest issues</h3><p className="muted">First 100 issues from this run.</p></div></div><IssueTable issues={runResult.issues} onResolve={(issue, status) => { setResolutionError(''); setResolutionTarget({ issue, status }); }} /></section>}
+        {resolutionTarget && <BakyaResolutionDialog issue={resolutionTarget.issue} status={resolutionTarget.status} busy={resolutionBusy} error={resolutionError} onClose={() => { if (!resolutionBusy) { setResolutionTarget(null); setResolutionError(''); } }} onSubmit={saveIssueResolution} />}
       </section>
     </div>
   );

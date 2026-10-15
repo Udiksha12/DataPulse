@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { bakyaApi } from './bakya_api.js';
+import BakyaResolutionDialog from './bakya_ResolutionDialog.jsx';
 
 const PAGE_SIZE = 10;
 
@@ -8,6 +9,9 @@ export default function BakyaRunDetailsPage({ token, runId, onBack }) {
   const [pageData, setPageData] = useState(null);
   const [page, setPage] = useState(0);
   const [error, setError] = useState('');
+  const [resolutionTarget, setResolutionTarget] = useState(null);
+  const [resolutionBusy, setResolutionBusy] = useState(false);
+  const [resolutionError, setResolutionError] = useState('');
 
   async function load() {
     try {
@@ -23,13 +27,15 @@ export default function BakyaRunDetailsPage({ token, runId, onBack }) {
 
   useEffect(() => { load(); }, [token, runId, page]);
 
-  async function changeStatus(issue, status) {
-    const note = window.prompt(status === 'RESOLVED' ? 'Briefly describe the resolution:' : 'Why are you changing this issue?');
-    if (!note?.trim()) return;
+  async function saveIssueResolution(note) {
+    if (!resolutionTarget) return false;
     try {
-      await bakyaApi.updateIssue(token, issue.issueId, { status, note: note.trim() });
+      setResolutionBusy(true); setResolutionError('');
+      await bakyaApi.updateIssue(token, resolutionTarget.issue.issueId, { status: resolutionTarget.status, note });
       await load();
-    } catch (err) { setError(err.message); }
+      return true;
+    } catch (err) { setResolutionError(err.message); return false; }
+    finally { setResolutionBusy(false); }
   }
 
   if (error && !run) return <div className="page-stack"><button className="button button-quiet" onClick={onBack}>← Back</button><div role="alert" className="notice notice-error">{error}</div></div>;
@@ -41,9 +47,10 @@ export default function BakyaRunDetailsPage({ token, runId, onBack }) {
     <section className="metric-grid"><article className="metric-card"><span className="metric-label">Overall quality</span><strong>{run.score ? <>{Number(run.score.overallScore).toFixed(1)}<em>/100</em></> : '—'}</strong><small>Completed {run.completedAt ? new Date(run.completedAt).toLocaleString() : 'in progress'}</small></article><article className="metric-card"><span className="metric-label">Rows checked</span><strong>{run.totalRows}</strong><small>CSV data records</small></article><article className="metric-card"><span className="metric-label">Open issues</span><strong>{pageData.content.filter((issue) => issue.status === 'OPEN').length}</strong><small>{run.issueCount} total issues across all pages</small></article></section>
     <section className="panel"><div className="panel-heading"><div><h2>Validation issues</h2><p className="muted">Resolution actions are recorded in the audit history.</p></div><span className="count-tag">{pageData.totalElements} issues</span></div>
       {!pageData.content.length ? <div className="empty-state"><h3>No issues found</h3><p>This run passed every configured check.</p></div> : <div className="table-scroll"><table><thead><tr><th>Row</th><th>Field</th><th>Severity</th><th>Issue</th><th>Observed value</th><th>Status</th><th>Action</th></tr></thead><tbody>{pageData.content.map((issue) => <tr key={issue.issueId}>
-        <td>{issue.rowNumber}</td><td>{issue.fieldName}</td><td><span className={`severity severity-${issue.severity.toLowerCase()}`}>{issue.severity}</span></td><td>{issue.message}</td><td>{issue.observedValue || '—'}</td><td><span className={`status-pill ${issue.status === 'OPEN' ? 'status-open' : 'status-done'}`}>{issue.status}</span></td><td>{issue.status === 'OPEN' ? <button className="text-button" onClick={() => changeStatus(issue, 'RESOLVED')}>Resolve</button> : <button className="text-button" onClick={() => changeStatus(issue, 'OPEN')}>Reopen</button>}</td>
+        <td>{issue.rowNumber}</td><td>{issue.fieldName}</td><td><span className={`severity severity-${issue.severity.toLowerCase()}`}>{issue.severity}</span></td><td>{issue.message}</td><td>{issue.observedValue || '—'}</td><td><span className={`status-pill ${issue.status === 'OPEN' ? 'status-open' : 'status-done'}`}>{issue.status}</span></td><td>{issue.status === 'OPEN' ? <button className="text-button" onClick={() => { setResolutionError(''); setResolutionTarget({ issue, status: 'RESOLVED' }); }}>Resolve</button> : <button className="text-button" onClick={() => { setResolutionError(''); setResolutionTarget({ issue, status: 'OPEN' }); }}>Reopen</button>}</td>
       </tr>)}</tbody></table></div>}
       <div className="pagination"><span>Page {pageData.page + 1} of {Math.max(pageData.totalPages, 1)}</span><div><button className="button button-quiet" disabled={page <= 0} onClick={() => setPage((value) => Math.max(0, value - 1))}>Previous</button><button className="button button-quiet" disabled={page + 1 >= pageData.totalPages} onClick={() => setPage((value) => value + 1)}>Next</button></div></div>
     </section>
+    {resolutionTarget && <BakyaResolutionDialog issue={resolutionTarget.issue} status={resolutionTarget.status} busy={resolutionBusy} error={resolutionError} onClose={() => { if (!resolutionBusy) { setResolutionTarget(null); setResolutionError(''); } }} onSubmit={saveIssueResolution} />}
   </div>;
 }

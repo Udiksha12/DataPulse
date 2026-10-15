@@ -660,6 +660,17 @@ const memoryDb = {
       created_at: now,
     });
 
+    store.audit_logs.push({
+      log_id: store.seq.audit++,
+      actor_user_id: Number(userId),
+      entity_type: 'QUALITY_ISSUE',
+      entity_id: Number(issueId),
+      action: 'SUPPORT_TEAM_NOTIFIED',
+      old_values: { status: oldStatus },
+      new_values: { status: newStatus, note: note.trim(), recipientTeam: 'DEV_PRODUCTION_SUPPORT' },
+      created_at: now,
+    });
+
     return issue;
   },
 
@@ -715,7 +726,16 @@ const memoryDb = {
     const totalUsers = store.users.length;
     const totalRuns = store.validation_runs.length;
     const totalIssues = store.quality_issues.length;
-    const recentAuditLogs = store.audit_logs.slice(-15).reverse();
+    const recentAuditLogs = store.audit_logs.slice(-15).reverse().map((log) => ({
+      logId: log.log_id,
+      actorUserId: log.actor_user_id,
+      entityType: log.entity_type,
+      entityId: log.entity_id,
+      action: log.action,
+      oldValues: log.old_values,
+      newValues: log.new_values,
+      createdAt: log.created_at,
+    }));
     const dashboardSummary = await db.getDashboardSummary(1, 'ADMIN');
 
     return {

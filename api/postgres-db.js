@@ -352,6 +352,12 @@ export const postgresDb = {
       if (!current.rowCount) { await client.query('ROLLBACK'); return null; }
       const updated = await client.query('UPDATE quality_issues SET status = $2, resolved_at = CASE WHEN $2 = \'OPEN\' THEN NULL ELSE now() END WHERE issue_id = $1 RETURNING *', [Number(issueId), newStatus]);
       await client.query('INSERT INTO issue_resolutions (issue_id, resolved_by_user_id, action, note) VALUES ($1, $2, $3, $4)', [Number(issueId), Number(userId), action, note.trim()]);
+      await client.query(`INSERT INTO audit_logs (actor_user_id, entity_type, entity_id, action, old_values, new_values)
+        VALUES ($1, 'QUALITY_ISSUE', $2, 'SUPPORT_TEAM_NOTIFIED', $3::jsonb, $4::jsonb)`, [
+        Number(userId), Number(issueId),
+        JSON.stringify({ status: current.rows[0].status }),
+        JSON.stringify({ status: newStatus, note: note.trim(), recipientTeam: 'DEV_PRODUCTION_SUPPORT' }),
+      ]);
       await client.query('COMMIT');
       return updated.rows[0];
     } catch (error) {
