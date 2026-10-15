@@ -4,10 +4,10 @@
  * Course: BCSE302P Database Systems Lab | Slot: L25+L26
  */
 
-import app from './index.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
+const { default: app } = await import('./index.js');
 
 const PORT = process.env.PORT || 8080;
 

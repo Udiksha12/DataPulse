@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 
 export default function BakyaLoginPage({ onLogin, loading, error }) {
-  const [email, setEmail] = useState('analyst@datapulse.local');
+  const [email, setEmail] = useState('bakya@datapulse.local');
   const [password, setPassword] = useState('');
 
   function submit(event) {

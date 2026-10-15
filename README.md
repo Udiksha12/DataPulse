@@ -46,7 +46,7 @@ All tech stacks specified in the BCSE302P curriculum and assessment document hav
 | **Frontend Frameworks** | React 19.3, Vite 7, Responsive CSS3 Grid/Flexbox | Page 4 (React, Vite, Responsive UI) |
 | **Backend Frameworks** | Express.js (Node.js 22+) **and** Spring Boot 3.5 (Java 21) | Page 3, 4 (Express.js, Spring Boot) |
 | **Relational Database** | PostgreSQL 18 (Local & Docker) | Page 3 (Relational RDBMS: PostgreSQL) |
-| **Managed Cloud Database** | Supabase PostgreSQL / Neon Serverless / Railway PostgreSQL | Page 9 (Cloud Database: Supabase / Railway / Aiven) |
+| **Managed Cloud Database** | PostgreSQL schema and connection settings are prepared; the Vercel Express demo currently uses in-memory operations and does not persist CRUD through `DATABASE_URL`. | Page 9 (Cloud Database: Supabase / Railway / Aiven) |
 | **Object Relational Mapping** | **Prisma ORM** (Express API) & **Hibernate / Spring Data JPA** (Spring Boot API) | Page 3, 4 (Prisma, Hibernate/JPA) |
 | **Authentication & Security** | JWT Bearer Tokens, BCrypt password hashing, Role-Based Access Control | Page 5, 6 (JWT, BCrypt, RBAC) |
 | **Single Users Table Design** | Unified `users` table with `role_id` FK (No separate user tables) | Page 6 (Strict Requirement) |
@@ -98,15 +98,16 @@ The database schema is defined in [`clouddatabase/schema.sql`](clouddatabase/sch
 
 ### Method A: Unified Node.js Full-Stack (Recommended for Instant Evaluation & Vercel)
 
-This mode runs the Express API with embedded 3NF relational engine / Cloud PostgreSQL and serves the React frontend:
+This mode runs the Express API's in-memory demo store and serves the React frontend. Use Docker/Spring Boot for PostgreSQL-backed local execution; Vercel demo changes may not persist between serverless requests:
 
 1. **Install dependencies**:
    ```powershell
    npm install
+   npm install --prefix frontend
    npm run build
    ```
 
-2. **Run Automated Test Suite (10/10 Tests)**:
+2. **Run Automated Test Suite (11 Tests)**:
    ```powershell
    npm test
    ```
@@ -171,9 +172,7 @@ npx vercel
 1. Push this repository to a **private GitHub repository** on `main`.
 2. Visit [vercel.com](https://vercel.com) and click **"Add New Project"**.
 3. Import the `datapulse` repository.
-4. Set Environment Variables in the Vercel dashboard:
-   - `JWT_SECRET`: Any random 32-character string.
-   - `DATABASE_URL` *(Optional)*: Your Cloud PostgreSQL connection URI (e.g. from Supabase / Neon / Railway).
+4. Set `JWT_SECRET` in the Vercel dashboard to a randomly generated secret of at least 32 characters. The Vercel API currently uses in-memory demo operations; `DATABASE_URL` alone does not make its CRUD persistent.
 5. Click **Deploy**. Vercel will build the React frontend and deploy the serverless API routes under `/api`.
 6. Access your **Live URL**: `https://datapulse-[unique-id].vercel.app`.
 
@@ -210,11 +209,12 @@ chmod +x ./clouddatabase/backup.sh ./clouddatabase/restore.sh
 ### Default User Credentials
 | Role | Email Address | Password | Permissions |
 |---|---|---|---|
-| **ADMIN** | `admin@datapulse.local` | `Admin@1234` | Full access: View all datasets, inspect system metrics, manage all data |
-| **ANALYST** | `analyst@datapulse.local` | `Analyst@1234` | Restricted access: Manage owned datasets, upload CSVs, resolve issues |
+| **ADMIN — Udiksha Agarwal** | `udiksha@datapulse.local` | `Udiksha@DataPulse2026` | Full access: View all datasets, inspect system metrics, manage all data |
+| **ANALYST — Bakya** | `bakya@datapulse.local` | `Bakya@DataPulse2026` | Restricted access: Manage owned datasets, upload CSVs, resolve issues |
+| **ANALYST — Rudra** | `rudra@datapulse.local` | `Rudra@DataPulse2026` | Restricted access: Manage owned datasets, upload CSVs, resolve issues |
 
 ### Demonstration Steps:
-1. **Login as Analyst**: Sign in with `analyst@datapulse.local`.
+1. **Login as Analyst**: Sign in with `bakya@datapulse.local`.
 2. **Review Default Dataset**: Open *"Student Attendance & Performance 2026"*.
 3. **Inspect Fields & Validation Rules**:
    - `record_id`: Rules = `REQUIRED`, `UNIQUE`
@@ -231,7 +231,7 @@ chmod +x ./clouddatabase/backup.sh ./clouddatabase/restore.sh
    - Click **Resolve**, choose action `FIXED`, enter a note, and submit.
    - Confirm audit trail creation in `audit_logs`.
 7. **Switch to Admin Account**:
-   - Sign in with `admin@datapulse.local`.
+   - Sign in with `udiksha@datapulse.local`.
    - Open **Admin Overview** (`/admin`) to verify cross-system analytics, user rosters, and audit logs.
 
 ---

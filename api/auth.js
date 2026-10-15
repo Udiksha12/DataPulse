@@ -12,10 +12,15 @@
 
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import { randomBytes } from 'node:crypto';
 import { db } from './db.js';
 import { printUdiksha24BAI0086Identity } from '../backend/identity/udiksha24BAI0086.js';
 
-const JWT_SECRET = process.env.DATAPULSE_JWT_SECRET_BASE64 || process.env.JWT_SECRET || 'datapulse-super-secret-key-vit-fall-2026';
+const configuredJwtSecret = process.env.DATAPULSE_JWT_SECRET_BASE64 || process.env.JWT_SECRET;
+if (!configuredJwtSecret && process.env.NODE_ENV === 'production') {
+  throw new Error('Set JWT_SECRET or DATAPULSE_JWT_SECRET_BASE64 before production startup.');
+}
+const JWT_SECRET = configuredJwtSecret || randomBytes(32).toString('hex');
 
 export const authService = {
   login: async (email, password) => {

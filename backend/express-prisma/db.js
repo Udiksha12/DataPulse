@@ -7,40 +7,23 @@
  * stored procedure logic (recalculate_quality_score), view (dataset_quality_summary),
  * and audit trigger (audit_quality_issue_change).
  *
- * Connects to live Cloud PostgreSQL (Supabase / Neon / Railway) via pg/Prisma
- * when DATABASE_URL is set, and seamlessly maintains high-availability in-memory
- * state with full relational consistency for immediate Vercel preview.
+ * This Express demo uses an in-memory store. PostgreSQL schema assets exist,
+ * but persistence is not wired into these API operations yet.
  */
 
 import bcrypt from 'bcryptjs';
-import pg from 'pg';
 import { printUdiksha24BAI0086Identity } from '../backend/identity/udiksha24BAI0086.js';
 import { printRudra24BKT0125Identity } from '../backend/identity/rudra24BKT0125.js';
 
 printUdiksha24BAI0086Identity();
 printRudra24BKT0125Identity();
 
-const { Pool } = pg;
-const dbUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL || null;
-
-let pool = null;
-if (dbUrl) {
-  try {
-    pool = new Pool({
-      connectionString: dbUrl,
-      ssl: { rejectUnauthorized: false },
-    });
-    console.info('[DataPulse DB] Connected to Cloud PostgreSQL instance.');
-  } catch (err) {
-    console.warn('[DataPulse DB] Could not connect to DATABASE_URL, using fallback store:', err.message);
-  }
-}
-
 // -----------------------------------------------------------------------------
 // Relational In-Memory Store (Mirrors PostgreSQL 10-table 3NF schema exactly)
 // -----------------------------------------------------------------------------
-const defaultAdminPassHash = bcrypt.hashSync(process.env.DATAPULSE_SEED_ADMIN_PASSWORD || 'Admin@1234', 10);
-const defaultAnalystPassHash = bcrypt.hashSync(process.env.DATAPULSE_SEED_ANALYST_PASSWORD || 'Analyst@1234', 10);
+const defaultAdminPassHash = bcrypt.hashSync(process.env.DATAPULSE_SEED_ADMIN_PASSWORD || 'Udiksha@DataPulse2026', 10);
+const defaultBakyaPassHash = bcrypt.hashSync(process.env.DATAPULSE_SEED_ANALYST_PASSWORD || 'Bakya@DataPulse2026', 10);
+const defaultRudraPassHash = bcrypt.hashSync(process.env.DATAPULSE_SEED_RUDRA_PASSWORD || 'Rudra@DataPulse2026', 10);
 
 const store = {
   // Table 1: roles
@@ -54,8 +37,8 @@ const store = {
     {
       user_id: 1,
       role_id: 1,
-      full_name: 'System Admin (Udiksha 24BAI0086)',
-      email: (process.env.DATAPULSE_SEED_ADMIN_EMAIL || 'admin@datapulse.local').toLowerCase(),
+      full_name: 'Udiksha Agarwal (24BAI0086)',
+      email: (process.env.DATAPULSE_SEED_ADMIN_EMAIL || 'udiksha@datapulse.local').toLowerCase(),
       password_hash: defaultAdminPassHash,
       is_active: true,
       created_at: new Date('2026-09-01T10:00:00Z'),
@@ -64,9 +47,19 @@ const store = {
     {
       user_id: 2,
       role_id: 2,
-      full_name: 'Institutional Analyst (Bakya 24BAI0071)',
-      email: (process.env.DATAPULSE_SEED_ANALYST_EMAIL || 'analyst@datapulse.local').toLowerCase(),
-      password_hash: defaultAnalystPassHash,
+      full_name: 'Bakya (24BAI0071)',
+      email: (process.env.DATAPULSE_SEED_ANALYST_EMAIL || 'bakya@datapulse.local').toLowerCase(),
+      password_hash: defaultBakyaPassHash,
+      is_active: true,
+      created_at: new Date('2026-09-01T10:00:00Z'),
+      updated_at: new Date('2026-09-01T10:00:00Z'),
+    },
+    {
+      user_id: 3,
+      role_id: 2,
+      full_name: 'Rudra (24BKT0125)',
+      email: (process.env.DATAPULSE_SEED_RUDRA_EMAIL || 'rudra@datapulse.local').toLowerCase(),
+      password_hash: defaultRudraPassHash,
       is_active: true,
       created_at: new Date('2026-09-01T10:00:00Z'),
       updated_at: new Date('2026-09-01T10:00:00Z'),
@@ -138,7 +131,7 @@ const store = {
 // -----------------------------------------------------------------------------
 
 export const db = {
-  isCloudConnected: () => !!pool,
+  databaseMode: () => 'In-Memory Relational Engine (3NF demo)',
 
   // --- USERS & AUTH ---
   findUserByEmail: async (email) => {

@@ -41,7 +41,7 @@ const router = express.Router();
 router.get('/health', (req, res) => {
   res.json({
     status: 'UP',
-    database: db.isCloudConnected() ? 'Cloud PostgreSQL Connected' : 'In-Memory Relational Engine (3NF)',
+    database: db.databaseMode(),
     timestamp: new Date().toISOString(),
     course: 'BCSE302P Database Systems Lab',
     slot: 'L25+L26',
