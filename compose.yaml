@@ -1,0 +1,52 @@
+services:
+  db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-datapulse}
+      POSTGRES_USER: ${POSTGRES_USER:-datapulse}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Copy .env.example to .env and set POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - datapulse_db:/var/lib/postgresql
+      - ./clouddatabase/schema.sql:/docker-entrypoint-initdb.d/00-datapulse-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-datapulse} -d ${POSTGRES_DB:-datapulse}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    build:
+      context: ./backend/spring-boot
+    restart: unless-stopped
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-datapulse}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-datapulse}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      DATAPULSE_JWT_SECRET_BASE64: ${DATAPULSE_JWT_SECRET_BASE64:?Set DATAPULSE_JWT_SECRET_BASE64 in .env}
+      DATAPULSE_SEED_ADMIN_EMAIL: ${DATAPULSE_SEED_ADMIN_EMAIL:-admin@datapulse.local}
+      DATAPULSE_SEED_ADMIN_PASSWORD: ${DATAPULSE_SEED_ADMIN_PASSWORD:?Set DATAPULSE_SEED_ADMIN_PASSWORD in .env}
+      DATAPULSE_SEED_ANALYST_EMAIL: ${DATAPULSE_SEED_ANALYST_EMAIL:-analyst@datapulse.local}
+      DATAPULSE_SEED_ANALYST_PASSWORD: ${DATAPULSE_SEED_ANALYST_PASSWORD:?Set DATAPULSE_SEED_ANALYST_PASSWORD in .env}
+      DATAPULSE_CORS_ORIGIN: ${DATAPULSE_CORS_ORIGIN:-http://localhost:5173}
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8080/api}
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
+volumes:
+  datapulse_db:

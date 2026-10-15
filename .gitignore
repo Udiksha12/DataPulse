@@ -1,0 +1,23 @@
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Java / Maven
+**/target/
+.mvn/wrapper/maven-wrapper.jar
+
+# Node
+**/node_modules/
+**/dist/
+npm-debug.log*
+
+# Local database and editor files
+*.dump
+*.sql.gz
+.DS_Store
+.idea/
+.vscode/
+*.swp

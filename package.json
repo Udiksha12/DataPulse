@@ -1,0 +1,42 @@
+{
+  "name": "datapulse",
+  "version": "1.0.0",
+  "description": "DataPulse - Institutional Dataset Quality & Validation Platform for BCSE302P Database Systems Lab",
+  "main": "api/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node api/server.js",
+    "dev:api": "node --watch api/server.js",
+    "dev:frontend": "npm run dev --prefix frontend",
+    "dev": "node api/server.js",
+    "build": "npm run build --prefix frontend",
+    "test": "node --test test/*.test.js"
+  },
+  "keywords": [
+    "database-systems",
+    "postgresql",
+    "prisma",
+    "express",
+    "react",
+    "vite",
+    "data-quality",
+    "jwt",
+    "rbac",
+    "bcse302p"
+  ],
+  "author": "Udiksha Agarwal (24BAI0086), Bakya (24BAI0071), Rudra (24BKT0125)",
+  "license": "MIT",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.5",
+    "csv-parse": "^5.6.0",
+    "dotenv": "^16.5.0",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^1.4.5-lts.1",
+    "pg": "^8.13.3"
+  },
+  "devDependencies": {
+    "prisma": "^6.4.1"
+  }
+}
