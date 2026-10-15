@@ -708,14 +708,14 @@ export const db = {
 
   getAdminOverview: async () => {
     const totalUsers = store.users.length;
-    const totalDatasets = store.datasets.length;
     const totalRuns = store.validation_runs.length;
     const totalIssues = store.quality_issues.length;
     const recentAuditLogs = store.audit_logs.slice(-15).reverse();
+    const dashboardSummary = await db.getDashboardSummary(1, 'ADMIN');
 
     return {
       totalUsers,
-      totalDatasets,
+      ...dashboardSummary,
       totalRuns,
       totalIssues,
       users: await db.getAllUsers(),
