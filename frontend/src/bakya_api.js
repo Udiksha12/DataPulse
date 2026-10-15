@@ -34,12 +34,25 @@ export const bakyaApi = {
     return request(`/datasets${query ? `?${query}` : ''}`, { token });
   },
   dataset: (token, id) => request(`/datasets/${id}`, { token }),
-  createDataset: (token, data) => request('/datasets', { token, method: 'POST', body: JSON.stringify(data) }),
+  createDataset: (token, data) => request('/datasets', { token, method: 'POST', body: JSON.stringify(data) }).then((dataset) => ({
+    ...dataset,
+    datasetId: dataset.datasetId ?? dataset.dataset_id,
+    datasetName: dataset.datasetName ?? dataset.dataset_name,
+    ownerId: dataset.ownerId ?? dataset.owner_id,
+    createdAt: dataset.createdAt ?? dataset.created_at,
+  })),
   updateDataset: (token, id, data) => request(`/datasets/${id}`, { token, method: 'PUT', body: JSON.stringify(data) }),
   archiveDataset: (token, id) => request(`/datasets/${id}`, { token, method: 'DELETE' }),
   updateField: (token, id, data) => request(`/fields/${id}`, { token, method: 'PUT', body: JSON.stringify(data) }),
   archiveField: (token, id) => request(`/fields/${id}`, { token, method: 'DELETE' }),
-  addField: (token, datasetId, data) => request(`/datasets/${datasetId}/fields`, { token, method: 'POST', body: JSON.stringify(data) }),
+  addField: (token, datasetId, data) => request(`/datasets/${datasetId}/fields`, { token, method: 'POST', body: JSON.stringify(data) }).then((field) => ({
+    ...field,
+    fieldId: field.fieldId ?? field.field_id,
+    datasetId: field.datasetId ?? field.dataset_id,
+    fieldName: field.fieldName ?? field.field_name,
+    dataType: field.dataType ?? field.data_type,
+    isActive: field.isActive ?? field.is_active,
+  })),
   addRule: (token, fieldId, data) => request(`/fields/${fieldId}/rules`, { token, method: 'POST', body: JSON.stringify(data) }),
   updateRule: (token, ruleId, data) => request(`/rules/${ruleId}`, { token, method: 'PUT', body: JSON.stringify(data) }),
   deactivateRule: (token, ruleId) => request(`/rules/${ruleId}`, { token, method: 'DELETE' }),
@@ -53,5 +66,9 @@ export const bakyaApi = {
     const query = new URLSearchParams(params).toString();
     return request(`/runs/${runId}/issues${query ? `?${query}` : ''}`, { token });
   },
-  updateIssue: (token, issueId, data) => request(`/issues/${issueId}/status`, { token, method: 'PATCH', body: JSON.stringify(data) }),
+  updateIssue: (token, issueId, data) => request(`/issues/${issueId}/status`, {
+    token,
+    method: 'PATCH',
+    body: JSON.stringify({ ...data, action: data.action || (data.status === 'RESOLVED' ? 'FIXED' : data.status === 'WAIVED' ? 'WAIVED' : 'REOPENED') }),
+  }),
 };

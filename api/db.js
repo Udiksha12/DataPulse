@@ -7,11 +7,12 @@
  * stored procedure logic (recalculate_quality_score), view (dataset_quality_summary),
  * and audit trigger (audit_quality_issue_change).
  *
- * API operations below currently use an in-memory demo store. PostgreSQL schema
- * assets exist, but cloud persistence must be wired before using this as production data.
+ * Uses Supabase PostgreSQL when DATABASE_URL is configured, with an in-memory
+ * fallback for local development without a database.
  */
 
 import bcrypt from 'bcryptjs';
+import { postgresDb } from './postgres-db.js';
 import { printUdiksha24BAI0086Identity } from '../backend/identity/udiksha24BAI0086.js';
 import { printRudra24BKT0125Identity } from '../backend/identity/rudra24BKT0125.js';
 
@@ -130,8 +131,9 @@ const store = {
 // Database Operations & Helper Functions
 // -----------------------------------------------------------------------------
 
-export const db = {
+const memoryDb = {
   databaseMode: () => 'In-Memory Relational Engine (3NF demo)',
+  healthCheck: async () => true,
 
   // --- USERS & AUTH ---
   findUserByEmail: async (email) => {
@@ -233,6 +235,7 @@ export const db = {
             severity: r.severity,
             ruleConfig: r.rule_config,
             isActive: r.is_active,
+            active: r.is_active,
             createdAt: r.created_at,
           }));
         return {
@@ -241,6 +244,7 @@ export const db = {
           fieldName: f.field_name,
           dataType: f.data_type,
           isActive: f.is_active,
+          active: f.is_active,
           createdAt: f.created_at,
           rules,
         };
@@ -249,7 +253,6 @@ export const db = {
     const runs = store.validation_runs
       .filter((r) => r.dataset_id === d.dataset_id)
       .sort((a, b) => new Date(b.started_at) - new Date(a.started_at))
-      .slice(0, 10)
       .map((r) => {
         const score = store.quality_scores.find((s) => s.run_id === r.run_id);
         return {
@@ -316,7 +319,7 @@ export const db = {
     return newDataset;
   },
 
-  updateDataset: async (datasetId, { datasetName, description }, userId, role) => {
+  updateDataset: async (datasetId, { datasetName, description, status }, userId, role) => {
     const d = store.datasets.find((item) => item.dataset_id === Number(datasetId));
     if (!d) return null;
     if (role !== 'ADMIN' && d.owner_id !== Number(userId)) {
@@ -326,6 +329,7 @@ export const db = {
     }
     if (datasetName) d.dataset_name = datasetName.trim();
     if (description !== undefined) d.description = description.trim();
+    if (status && ['ACTIVE', 'ARCHIVED'].includes(status.toUpperCase())) d.status = status.toUpperCase();
     d.updated_at = new Date();
     return d;
   },
@@ -554,6 +558,7 @@ export const db = {
     return {
       runId: run.run_id,
       datasetId: run.dataset_id,
+      datasetName: store.datasets.find((dataset) => dataset.dataset_id === run.dataset_id)?.dataset_name || 'Unknown dataset',
       startedBy: run.started_by,
       status: run.status,
       totalRows: run.total_rows,
@@ -723,3 +728,5 @@ export const db = {
     };
   },
 };
+
+export const db = process.env.DATABASE_URL || process.env.POSTGRES_URL ? postgresDb : memoryDb;

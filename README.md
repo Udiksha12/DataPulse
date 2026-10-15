@@ -46,7 +46,7 @@ All tech stacks specified in the BCSE302P curriculum and assessment document hav
 | **Frontend Frameworks** | React 19.3, Vite 7, Responsive CSS3 Grid/Flexbox | Page 4 (React, Vite, Responsive UI) |
 | **Backend Frameworks** | Express.js (Node.js 22+) **and** Spring Boot 3.5 (Java 21) | Page 3, 4 (Express.js, Spring Boot) |
 | **Relational Database** | PostgreSQL 18 (Local & Docker) | Page 3 (Relational RDBMS: PostgreSQL) |
-| **Managed Cloud Database** | PostgreSQL schema and connection settings are prepared; the Vercel Express demo currently uses in-memory operations and does not persist CRUD through `DATABASE_URL`. | Page 9 (Cloud Database: Supabase / Railway / Aiven) |
+| **Managed Cloud Database** | Supabase PostgreSQL is used by the Express API when `DATABASE_URL` is configured; local in-memory mode is only a development fallback. | Page 9 (Cloud Database: Supabase / Railway / Aiven) |
 | **Object Relational Mapping** | **Prisma ORM** (Express API) & **Hibernate / Spring Data JPA** (Spring Boot API) | Page 3, 4 (Prisma, Hibernate/JPA) |
 | **Authentication & Security** | JWT Bearer Tokens, BCrypt password hashing, Role-Based Access Control | Page 5, 6 (JWT, BCrypt, RBAC) |
 | **Single Users Table Design** | Unified `users` table with `role_id` FK (No separate user tables) | Page 6 (Strict Requirement) |
@@ -98,7 +98,7 @@ The database schema is defined in [`clouddatabase/schema.sql`](clouddatabase/sch
 
 ### Method A: Unified Node.js Full-Stack (Recommended for Instant Evaluation & Vercel)
 
-This mode runs the Express API's in-memory demo store and serves the React frontend. Use Docker/Spring Boot for PostgreSQL-backed local execution; Vercel demo changes may not persist between serverless requests:
+This mode runs the Express API against Supabase PostgreSQL when `DATABASE_URL` is set; without it, a local in-memory fallback is used. Vercel persistence requires the Supabase schema to be applied and `DATABASE_URL` configured:
 
 1. **Install dependencies**:
    ```powershell
@@ -107,7 +107,7 @@ This mode runs the Express API's in-memory demo store and serves the React front
    npm run build
    ```
 
-2. **Run Automated Test Suite (11 Tests)**:
+2. **Run Automated Test Suite (14 Tests)**:
    ```powershell
    npm test
    ```
@@ -172,9 +172,10 @@ npx vercel
 1. Push this repository to a **private GitHub repository** on `main`.
 2. Visit [vercel.com](https://vercel.com) and click **"Add New Project"**.
 3. Import the `datapulse` repository.
-4. Set `JWT_SECRET` in the Vercel dashboard to a randomly generated secret of at least 32 characters. The Vercel API currently uses in-memory demo operations; `DATABASE_URL` alone does not make its CRUD persistent.
-5. Click **Deploy**. Vercel will build the React frontend and deploy the serverless API routes under `/api`.
-6. Access your **Live URL**: `https://datapulse-[unique-id].vercel.app`.
+4. In Supabase, create a PostgreSQL project and run [`clouddatabase/schema.sql`](clouddatabase/schema.sql) once in **SQL Editor**. This creates the normalized tables, view, procedure, trigger, indexes, and roles. The API seeds the demo users, dataset, fields, and rules on its first database connection.
+5. In Supabase **Connect**, copy the **Transaction pooler** URI. In Vercel Project Settings → Environment Variables, add it as `DATABASE_URL` for Production and Preview. Also set `JWT_SECRET` to a private random value of at least 32 characters.
+6. Redeploy the latest `main` commit. Check `/api/health`; it should report `Supabase PostgreSQL` (not the in-memory demo store).
+7. Use your Vercel production URL for the interactive application. Dataset changes, each validation run, issue status, scores, and audit rows are saved in PostgreSQL.
 
 ---
 

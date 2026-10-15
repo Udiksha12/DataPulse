@@ -16,6 +16,9 @@ describe('DataPulse API Integration Test Suite', () => {
   let createdDatasetId;
   let sampleFieldId;
   let sampleRuleId;
+  let sampleUniqueRuleId;
+  let validationRunId;
+  let sampleIssueId;
 
   before(async () => {
     await new Promise((resolve) => {
@@ -163,10 +166,18 @@ describe('DataPulse API Integration Test Suite', () => {
     assert.equal(ruleRes.status, 201);
     const ruleData = await ruleRes.json();
     sampleRuleId = ruleData.rule_id;
+
+    const uniqueRuleRes = await fetch(`${baseUrl}/fields/${sampleFieldId}/rules`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${analystToken}` },
+      body: JSON.stringify({ ruleType: 'UNIQUE', severity: 'HIGH' }),
+    });
+    assert.equal(uniqueRuleRes.status, 201);
+    sampleUniqueRuleId = (await uniqueRuleRes.json()).rule_id;
   });
 
   test('11. CSV Validation Run executes transaction, procedure and trigger', async () => {
-    const csvContent = 'record_id,email,attendance_pct,department\nREC-001,alice@vit.ac.in,95,CSE\nREC-002,bademail,150,ECE';
+    const csvContent = 'student_id\nS001\nS001';
     const boundary = '----WebKitFormBoundary7MA4YWxkTrZu0gW';
     const multipartBody =
       `--${boundary}\r\n` +
@@ -175,7 +186,7 @@ describe('DataPulse API Integration Test Suite', () => {
       `${csvContent}\r\n` +
       `--${boundary}--\r\n`;
 
-    const res = await fetch(`${baseUrl}/datasets/1/runs`, {
+    const res = await fetch(`${baseUrl}/datasets/${createdDatasetId}/runs`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${analystToken}`,
@@ -186,6 +197,7 @@ describe('DataPulse API Integration Test Suite', () => {
 
     assert.equal(res.status, 201);
     const run = await res.json();
+    validationRunId = run.runId;
     assert.equal(run.status, 'COMPLETED');
     assert.equal(run.totalRows, 2);
     assert.ok(run.score !== null);
@@ -199,5 +211,56 @@ describe('DataPulse API Integration Test Suite', () => {
     assert.equal(issuesRes.status, 200);
     const issues = await issuesRes.json();
     assert.ok(issues.totalElements > 0);
+    sampleIssueId = issues.content[0].issueId;
+  });
+
+  test('12. Validation runs are independently retrievable with dataset details', async () => {
+    const [runRes, datasetRes] = await Promise.all([
+      fetch(`${baseUrl}/runs/${validationRunId}`, { headers: { Authorization: `Bearer ${analystToken}` } }),
+      fetch(`${baseUrl}/datasets/${createdDatasetId}`, { headers: { Authorization: `Bearer ${analystToken}` } }),
+    ]);
+    assert.equal(runRes.status, 200);
+    const run = await runRes.json();
+    assert.equal(run.runId, validationRunId);
+    assert.equal(run.datasetName, 'Automated Lab Test Dataset 2026');
+    assert.ok(run.score.overallScore >= 0);
+    assert.equal(datasetRes.status, 200);
+    const dataset = await datasetRes.json();
+    assert.ok(dataset.runs.some((item) => item.runId === validationRunId));
+  });
+
+  test('13. Issue resolution persists status and resolution note', async () => {
+    const resolveRes = await fetch(`${baseUrl}/issues/${sampleIssueId}/status`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${analystToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'FIXED', note: 'Corrected during demo review.' }),
+    });
+    assert.equal(resolveRes.status, 200);
+    const resolved = await resolveRes.json();
+    assert.equal(resolved.status, 'RESOLVED');
+
+    const issuesRes = await fetch(`${baseUrl}/runs/${validationRunId}/issues?status=RESOLVED`, {
+      headers: { Authorization: `Bearer ${analystToken}` },
+    });
+    const issues = await issuesRes.json();
+    const resolvedIssue = issues.content.find((issue) => issue.issueId === sampleIssueId);
+    assert.equal(resolvedIssue.status, 'RESOLVED');
+    assert.equal(resolvedIssue.resolutions[0].note, 'Corrected during demo review.');
+  });
+
+  test('14. Archived datasets can be restored', async () => {
+    const archiveRes = await fetch(`${baseUrl}/datasets/${createdDatasetId}`, {
+      method: 'DELETE', headers: { Authorization: `Bearer ${analystToken}` },
+    });
+    assert.equal(archiveRes.status, 200);
+    assert.equal((await archiveRes.json()).status, 'ARCHIVED');
+
+    const restoreRes = await fetch(`${baseUrl}/datasets/${createdDatasetId}`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${analystToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'ACTIVE' }),
+    });
+    assert.equal(restoreRes.status, 200);
+    assert.equal((await restoreRes.json()).status, 'ACTIVE');
   });
 });
