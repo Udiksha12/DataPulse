@@ -1,0 +1,38 @@
+server:
+  port: ${PORT:8080}
+
+spring:
+  application:
+    name: datapulse-api
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/datapulse}
+    username: ${SPRING_DATASOURCE_USERNAME:datapulse}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: true
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
+
+datapulse:
+  jwt:
+    secret-base64: ${DATAPULSE_JWT_SECRET_BASE64:}
+    ttl: PT3H
+  cors:
+    origin: ${DATAPULSE_CORS_ORIGIN:http://localhost:5173}
+  seed:
+    admin-email: ${DATAPULSE_SEED_ADMIN_EMAIL:}
+    admin-password: ${DATAPULSE_SEED_ADMIN_PASSWORD:}
+    analyst-email: ${DATAPULSE_SEED_ANALYST_EMAIL:}
+    analyst-password: ${DATAPULSE_SEED_ANALYST_PASSWORD:}
+
+logging:
+  level:
+    org.springframework.security: INFO
+    org.hibernate.SQL: WARN
