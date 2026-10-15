@@ -1,0 +1,176 @@
+// Prisma Schema for DataPulse
+// Aligns exactly with the 10 normalized tables from BCSE302P Database Systems Lab rubric
+// Contributors: Udiksha Agarwal (24BAI0086), Bakya (24BAI0071), Rudra (24BKT0125)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Role {
+  roleId      BigInt   @id @default(autoincrement()) @map("role_id")
+  roleName    String   @unique @map("role_name") @db.VarChar(30)
+  description String?  @db.Text
+  users       User[]
+
+  @@map("roles")
+}
+
+model User {
+  userId        BigInt            @id @default(autoincrement()) @map("user_id")
+  roleId        BigInt            @map("role_id")
+  fullName      String            @map("full_name") @db.VarChar(120)
+  email         String            @unique @map("email") @db.VarChar(254)
+  passwordHash  String            @map("password_hash") @db.VarChar(255)
+  isActive      Boolean           @default(true) @map("is_active")
+  createdAt     DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  role          Role              @relation(fields: [roleId], references: [roleId])
+  datasets      Dataset[]
+  runs          ValidationRun[]
+  resolutions   IssueResolution[]
+  auditLogs     AuditLog[]
+
+  @@map("users")
+}
+
+model Dataset {
+  datasetId   BigInt          @id @default(autoincrement()) @map("dataset_id")
+  ownerId     BigInt          @map("owner_id")
+  datasetName String          @map("dataset_name") @db.VarChar(160)
+  description String?         @db.Text
+  status      String          @default("ACTIVE") @db.VarChar(20)
+  createdAt   DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  owner       User            @relation(fields: [ownerId], references: [userId])
+  fields      DatasetField[]
+  runs        ValidationRun[]
+
+  @@unique([ownerId, datasetName], map: "uq_datasets_owner_name")
+  @@index([ownerId, status], map: "ix_datasets_owner_status")
+  @@map("datasets")
+}
+
+model DatasetField {
+  fieldId    BigInt           @id @default(autoincrement()) @map("field_id")
+  datasetId  BigInt           @map("dataset_id")
+  fieldName  String           @map("field_name") @db.VarChar(120)
+  dataType   String           @default("TEXT") @map("data_type") @db.VarChar(20)
+  isActive   Boolean          @default(true) @map("is_active")
+  createdAt  DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  dataset    Dataset          @relation(fields: [datasetId], references: [datasetId], onDelete: Cascade)
+  rules      ValidationRule[]
+
+  @@unique([datasetId, fieldName], map: "uq_dataset_fields_dataset_name")
+  @@index([datasetId], map: "ix_dataset_fields_dataset")
+  @@map("dataset_fields")
+}
+
+model ValidationRule {
+  ruleId     BigInt         @id @default(autoincrement()) @map("rule_id")
+  fieldId    BigInt         @map("field_id")
+  ruleType   String         @map("rule_type") @db.VarChar(20)
+  severity   String         @default("MEDIUM") @db.VarChar(10)
+  ruleConfig Json           @default("{}") @map("rule_config")
+  isActive   Boolean        @default(true) @map("is_active")
+  createdAt  DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  field      DatasetField   @relation(fields: [fieldId], references: [fieldId])
+  issues     QualityIssue[]
+
+  @@index([fieldId, isActive], map: "ix_validation_rules_field_active")
+  @@map("validation_rules")
+}
+
+model ValidationRun {
+  runId          BigInt         @id @default(autoincrement()) @map("run_id")
+  datasetId      BigInt         @map("dataset_id")
+  startedBy      BigInt         @map("started_by")
+  startedAt      DateTime       @default(now()) @map("started_at") @db.Timestamptz(6)
+  completedAt    DateTime?      @map("completed_at") @db.Timestamptz(6)
+  status         String         @default("QUEUED") @db.VarChar(20)
+  totalRows      Int            @default(0) @map("total_rows")
+  issueCount     Int            @default(0) @map("issue_count")
+  failureMessage String?        @map("failure_message") @db.Text
+
+  dataset        Dataset        @relation(fields: [datasetId], references: [datasetId])
+  starter        User           @relation(fields: [startedBy], references: [userId])
+  issues         QualityIssue[]
+  score          QualityScore?
+
+  @@index([datasetId, startedAt(sort: Desc)], map: "ix_validation_runs_dataset_started")
+  @@map("validation_runs")
+}
+
+model QualityIssue {
+  issueId       BigInt            @id @default(autoincrement()) @map("issue_id")
+  runId         BigInt            @map("run_id")
+  ruleId        BigInt            @map("rule_id")
+  rowNumber     Int               @map("row_number")
+  severity      String            @db.VarChar(10)
+  message       String            @db.Text
+  observedValue String?           @map("observed_value") @db.Text
+  status        String            @default("OPEN") @db.VarChar(20)
+  createdAt     DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  resolvedAt    DateTime?         @map("resolved_at") @db.Timestamptz(6)
+
+  run           ValidationRun     @relation(fields: [runId], references: [runId])
+  rule          ValidationRule    @relation(fields: [ruleId], references: [ruleId])
+  resolutions   IssueResolution[]
+
+  @@unique([runId, ruleId, rowNumber], map: "uq_quality_issues_run_rule_row")
+  @@index([runId, status, severity], map: "ix_quality_issues_run_status_severity")
+  @@map("quality_issues")
+}
+
+model IssueResolution {
+  resolutionId     BigInt       @id @default(autoincrement()) @map("resolution_id")
+  issueId          BigInt       @map("issue_id")
+  resolvedByUserId BigInt       @map("resolved_by_user_id")
+  action           String       @db.VarChar(20)
+  note             String       @db.Text
+  resolvedAt       DateTime     @default(now()) @map("resolved_at") @db.Timestamptz(6)
+
+  issue            QualityIssue @relation(fields: [issueId], references: [issueId])
+  resolver         User         @relation(fields: [resolvedByUserId], references: [userId])
+
+  @@index([issueId, resolvedAt(sort: Desc)], map: "ix_issue_resolutions_issue_time")
+  @@map("issue_resolutions")
+}
+
+model QualityScore {
+  scoreId           BigInt        @id @default(autoincrement()) @map("score_id")
+  runId             BigInt        @unique @map("run_id")
+  completenessScore Decimal       @map("completeness_score") @db.Decimal(5, 2)
+  validityScore     Decimal       @map("validity_score") @db.Decimal(5, 2)
+  uniquenessScore   Decimal       @map("uniqueness_score") @db.Decimal(5, 2)
+  overallScore      Decimal       @map("overall_score") @db.Decimal(5, 2)
+  calculatedAt      DateTime      @default(now()) @map("calculated_at") @db.Timestamptz(6)
+
+  run               ValidationRun @relation(fields: [runId], references: [runId])
+
+  @@map("quality_scores")
+}
+
+model AuditLog {
+  logId       BigInt   @id @default(autoincrement()) @map("log_id")
+  actorUserId BigInt?  @map("actor_user_id")
+  entityType  String   @map("entity_type") @db.VarChar(40)
+  entityId    BigInt   @map("entity_id")
+  action      String   @db.VarChar(40)
+  oldValues   Json?    @map("old_values")
+  newValues   Json?    @map("new_values")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  actor       User?    @relation(fields: [actorUserId], references: [userId])
+
+  @@index([entityType, entityId, createdAt(sort: Desc)], map: "ix_audit_logs_entity_time")
+  @@map("audit_logs")
+}
