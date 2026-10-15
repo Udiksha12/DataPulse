@@ -3,6 +3,19 @@ import { bakyaApi } from './bakya_api.js';
 
 const INITIAL_PAGE_SIZE = 8;
 
+function normalizePage(result, page, size) {
+  if (!Array.isArray(result)) return result;
+
+  const start = page * size;
+  return {
+    content: result.slice(start, start + size),
+    page,
+    size,
+    totalElements: result.length,
+    totalPages: Math.max(1, Math.ceil(result.length / size)),
+  };
+}
+
 export default function BakyaDatasetsPage({ token, openDatasetId, onDatasetOpened, onSelectRun }) {
   const [pageData, setPageData] = useState(null);
   const [query, setQuery] = useState('');
@@ -16,7 +29,7 @@ export default function BakyaDatasetsPage({ token, openDatasetId, onDatasetOpene
   const load = useCallback(async () => {
     try {
       const result = await bakyaApi.datasets(token, { page, size: INITIAL_PAGE_SIZE, q: query, status });
-      setPageData(result);
+      setPageData(normalizePage(result, page, INITIAL_PAGE_SIZE));
       setError('');
     } catch (err) { setError(err.message); }
   }, [token, page, query, status]);
@@ -47,7 +60,7 @@ export default function BakyaDatasetsPage({ token, openDatasetId, onDatasetOpene
       setQuery(''); setStatus('');
       setPage(0);
       const refreshed = await bakyaApi.datasets(token, { page: 0, size: INITIAL_PAGE_SIZE });
-      setPageData(refreshed);
+      setPageData(normalizePage(refreshed, 0, INITIAL_PAGE_SIZE));
     } catch (err) { setError(err.message); }
     finally { setBusy(false); }
   }
