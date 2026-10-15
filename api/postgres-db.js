@@ -21,6 +21,17 @@ function fail(message, status = 400) {
   return error;
 }
 
+export function buildIssueStatusUpdateQuery(issueId, newStatus) {
+  return {
+    text: `UPDATE quality_issues
+      SET status = $2,
+          resolved_at = CASE WHEN $3 THEN NULL ELSE now() END
+      WHERE issue_id = $1
+      RETURNING *`,
+    values: [Number(issueId), newStatus, newStatus === 'OPEN'],
+  };
+}
+
 async function initialize() {
   if (!pool) throw new Error('DATABASE_URL is required for the PostgreSQL adapter.');
   const client = await pool.connect();
@@ -350,7 +361,8 @@ export const postgresDb = {
       await client.query("SELECT set_config('app.user_id', $1, true)", [String(Number(userId))]);
       const current = await client.query('SELECT * FROM quality_issues WHERE issue_id = $1 FOR UPDATE', [Number(issueId)]);
       if (!current.rowCount) { await client.query('ROLLBACK'); return null; }
-      const updated = await client.query('UPDATE quality_issues SET status = $2, resolved_at = CASE WHEN $2 = \'OPEN\' THEN NULL ELSE now() END WHERE issue_id = $1 RETURNING *', [Number(issueId), newStatus]);
+      const statusUpdate = buildIssueStatusUpdateQuery(issueId, newStatus);
+      const updated = await client.query(statusUpdate.text, statusUpdate.values);
       await client.query('INSERT INTO issue_resolutions (issue_id, resolved_by_user_id, action, note) VALUES ($1, $2, $3, $4)', [Number(issueId), Number(userId), action, note.trim()]);
       await client.query(`INSERT INTO audit_logs (actor_user_id, entity_type, entity_id, action, old_values, new_values)
         VALUES ($1, 'QUALITY_ISSUE', $2, 'SUPPORT_TEAM_NOTIFIED', $3::jsonb, $4::jsonb)`, [

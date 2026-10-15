@@ -7,6 +7,7 @@
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import app from '../api/index.js';
+import { buildIssueStatusUpdateQuery } from '../api/postgres-db.js';
 
 describe('DataPulse API Integration Test Suite', () => {
   let server;
@@ -19,6 +20,16 @@ describe('DataPulse API Integration Test Suite', () => {
   let sampleUniqueRuleId;
   let validationRunId;
   let sampleIssueId;
+
+  test('PostgreSQL issue status update binds status and reopen flag with consistent types', () => {
+    const resolveQuery = buildIssueStatusUpdateQuery(42, 'RESOLVED');
+    assert.match(resolveQuery.text, /status = \$2/);
+    assert.match(resolveQuery.text, /CASE WHEN \$3 THEN NULL ELSE now\(\) END/);
+    assert.deepEqual(resolveQuery.values, [42, 'RESOLVED', false]);
+
+    const reopenQuery = buildIssueStatusUpdateQuery(42, 'OPEN');
+    assert.deepEqual(reopenQuery.values, [42, 'OPEN', true]);
+  });
 
   before(async () => {
     await new Promise((resolve) => {
