@@ -38,25 +38,20 @@ const router = express.Router();
 // -----------------------------------------------------------------------------
 // Health, Metrics & Student Identity Endpoints
 // -----------------------------------------------------------------------------
-router.get('/health', async (req, res) => {
-  try {
-    await db.healthCheck();
-    res.json({
-      status: 'UP',
-      database: db.databaseMode(),
-      timestamp: new Date().toISOString(),
-      course: 'BCSE302P Database Systems Lab',
-      slot: 'L25+L26',
-      faculty: 'Dr. V. SIVAKUMAR',
-      contributors: {
-        backend: 'Udiksha Agarwal (24BAI0086)',
-        frontend: 'Bakya (24BAI0071)',
-        database: 'Rudra (24BKT0125)',
-      },
-    });
-  } catch (error) {
-    res.status(503).json({ status: 'DOWN', database: db.databaseMode(), message: error.message });
-  }
+router.get('/health', (req, res) => {
+  res.json({
+    status: 'UP',
+    database: db.isCloudConnected() ? 'Cloud PostgreSQL Connected' : 'In-Memory Relational Engine (3NF)',
+    timestamp: new Date().toISOString(),
+    course: 'BCSE302P Database Systems Lab',
+    slot: 'L25+L26',
+    faculty: 'Dr. V. SIVAKUMAR',
+    contributors: {
+      backend: 'Udiksha Agarwal (24BAI0086)',
+      frontend: 'Bakya (24BAI0071)',
+      database: 'Rudra (24BKT0125)',
+    },
+  });
 });
 
 // Prometheus Metrics Endpoint for Grafana / Prometheus (rubric requirement)

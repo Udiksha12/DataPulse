@@ -1,21 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { bakyaApi } from './bakya_api.js';
-import BakyaResolutionDialog from './bakya_ResolutionDialog.jsx';
 
 const INITIAL_PAGE_SIZE = 8;
-
-function normalizePage(result, page, size) {
-  if (!Array.isArray(result)) return result;
-
-  const start = page * size;
-  return {
-    content: result.slice(start, start + size),
-    page,
-    size,
-    totalElements: result.length,
-    totalPages: Math.max(1, Math.ceil(result.length / size)),
-  };
-}
 
 export default function BakyaDatasetsPage({ token, openDatasetId, onDatasetOpened, onSelectRun }) {
   const [pageData, setPageData] = useState(null);
@@ -30,7 +16,7 @@ export default function BakyaDatasetsPage({ token, openDatasetId, onDatasetOpene
   const load = useCallback(async () => {
     try {
       const result = await bakyaApi.datasets(token, { page, size: INITIAL_PAGE_SIZE, q: query, status });
-      setPageData(normalizePage(result, page, INITIAL_PAGE_SIZE));
+      setPageData(result);
       setError('');
     } catch (err) { setError(err.message); }
   }, [token, page, query, status]);
@@ -61,7 +47,7 @@ export default function BakyaDatasetsPage({ token, openDatasetId, onDatasetOpene
       setQuery(''); setStatus('');
       setPage(0);
       const refreshed = await bakyaApi.datasets(token, { page: 0, size: INITIAL_PAGE_SIZE });
-      setPageData(normalizePage(refreshed, 0, INITIAL_PAGE_SIZE));
+      setPageData(refreshed);
     } catch (err) { setError(err.message); }
     finally { setBusy(false); }
   }
@@ -69,11 +55,6 @@ export default function BakyaDatasetsPage({ token, openDatasetId, onDatasetOpene
   async function archive(dataset) {
     if (!window.confirm(`Archive “${dataset.datasetName}”? Its run history will stay available.`)) return;
     try { await bakyaApi.archiveDataset(token, dataset.datasetId); setSelected(null); await load(); }
-    catch (err) { setError(err.message); }
-  }
-
-  async function restore(dataset) {
-    try { await bakyaApi.updateDataset(token, dataset.datasetId, { status: 'ACTIVE' }); await load(); }
     catch (err) { setError(err.message); }
   }
 
@@ -93,9 +74,9 @@ export default function BakyaDatasetsPage({ token, openDatasetId, onDatasetOpene
           <div className="table-scroll"><table><thead><tr><th>Dataset</th><th>Fields</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead><tbody>
             {pageData.content.map((dataset) => <tr key={dataset.datasetId}>
               <td><button className="table-link" onClick={() => setSelected(dataset)}>{dataset.datasetName}</button><small className="table-sub">{dataset.description || `Dataset ${dataset.datasetId}`}</small></td>
-              <td>{dataset.fieldCount ?? dataset.fields?.length ?? 0}</td><td><span className={`status-pill ${dataset.status === 'ACTIVE' ? 'status-active' : 'status-archived'}`}>{dataset.status}</span></td>
+              <td>{dataset.fields?.length || 0}</td><td><span className={`status-pill ${dataset.status === 'ACTIVE' ? 'status-active' : 'status-archived'}`}>{dataset.status}</span></td>
               <td>{dataset.createdAt ? new Date(dataset.createdAt).toLocaleDateString() : '—'}</td>
-              <td className="row-actions"><button className="text-button" onClick={() => setSelected(dataset)}>Configure</button>{dataset.status === 'ACTIVE' ? <button className="text-button danger-text" onClick={() => archive(dataset)}>Archive</button> : <button className="text-button" onClick={() => restore(dataset)}>Restore</button>}</td>
+              <td className="row-actions"><button className="text-button" onClick={() => setSelected(dataset)}>Configure</button>{dataset.status === 'ACTIVE' && <button className="text-button danger-text" onClick={() => archive(dataset)}>Archive</button>}</td>
             </tr>)}
           </tbody></table></div>
         )}
@@ -119,9 +100,6 @@ function BakyaDatasetWorkspace({ token, initialDataset, onClose, onReload, onSel
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
-  const [resolutionTarget, setResolutionTarget] = useState(null);
-  const [resolutionBusy, setResolutionBusy] = useState(false);
-  const [resolutionError, setResolutionError] = useState('');
 
   useEffect(() => {
     bakyaApi.dataset(token, initialDataset.datasetId).then((fresh) => {
@@ -194,29 +172,22 @@ function BakyaDatasetWorkspace({ token, initialDataset, onClose, onReload, onSel
     setSaving(true); setError(''); setMessage('');
     try {
       const result = await bakyaApi.createRun(token, dataset.datasetId, file);
-      const issues = await bakyaApi.issues(token, result.runId, { page: 0, size: 100 });
-      setRunResult({ ...result, issues: issues.content });
+      setRunResult(result);
       setMessage(`Run ${result.runId} completed with ${result.issueCount} issue(s).`);
-      await refreshDataset(); await onReload();
+      await onReload();
     } catch (err) { setError(err.message); }
     finally { setSaving(false); }
   }
 
-  async function saveIssueResolution(note) {
-    if (!resolutionTarget) return false;
-    const { issue, status } = resolutionTarget;
-    setResolutionBusy(true); setResolutionError('');
+  async function resolveIssue(issue, status) {
+    const note = window.prompt(status === 'RESOLVED' ? 'Briefly describe the resolution:' : 'Why are you changing this issue?');
+    if (!note?.trim()) return;
     try {
-      await bakyaApi.updateIssue(token, issue.issueId, { status, note });
-      const [updated, issues] = await Promise.all([
-        bakyaApi.run(token, issue.runId),
-        bakyaApi.issues(token, issue.runId, { page: 0, size: 100 }),
-      ]);
-      setRunResult({ ...updated, issues: issues.content });
-      await Promise.all([refreshDataset(), onReload()]);
-      return true;
-    } catch (err) { setResolutionError(err.message); return false; }
-    finally { setResolutionBusy(false); }
+      await bakyaApi.updateIssue(token, issue.issueId, { status, note: note.trim() });
+      const updated = await bakyaApi.run(token, issue.runId);
+      setRunResult(updated);
+      await onReload();
+    } catch (err) { setError(err.message); }
   }
 
   async function refreshDataset() {
@@ -233,9 +204,9 @@ function BakyaDatasetWorkspace({ token, initialDataset, onClose, onReload, onSel
         <div className="workspace-grid">
           <section className="sub-panel"><div className="panel-heading"><div><h3>Fields & rules</h3><p className="muted">Rules run against each uploaded row.</p></div></div>
             {!dataset.fields?.length ? <p className="small-note">Add fields that match the CSV header names.</p> : <div className="field-list">{dataset.fields.map((field) => <article className="field-card" key={field.fieldId}>
-              <div><strong>{field.fieldName}</strong><span className="type-label">{field.dataType}</span><span className={`status-pill ${(field.active ?? field.isActive) ? 'status-active' : 'status-archived'}`}>{(field.active ?? field.isActive) ? 'ACTIVE' : 'ARCHIVED'}</span></div>
-              {field.rules?.filter((rule) => rule.active ?? rule.isActive).length > 0 && <ul>{field.rules.filter((rule) => rule.active ?? rule.isActive).map((rule) => <li key={rule.ruleId}>{rule.ruleType}{rule.ruleType === 'RANGE' ? ` ${rule.ruleConfig?.min}–${rule.ruleConfig?.max}` : ''}<span>{rule.severity.toLowerCase()}</span><button className="text-button danger-text" type="button" onClick={() => deactivateRule(rule)}>Disable</button></li>)}</ul>}
-              {(field.active ?? field.isActive) && <div className="field-actions"><button className="text-button" type="button" onClick={() => renameField(field)}>Rename</button><button className="text-button" type="button" onClick={() => setRuleFieldId(ruleFieldId === field.fieldId ? null : field.fieldId)}>Add rule</button><button className="text-button danger-text" type="button" onClick={() => archiveField(field)}>Archive field</button></div>}
+              <div><strong>{field.fieldName}</strong><span className="type-label">{field.dataType}</span><span className={`status-pill ${field.active ? 'status-active' : 'status-archived'}`}>{field.active ? 'ACTIVE' : 'ARCHIVED'}</span></div>
+              {field.rules?.filter((rule) => rule.active).length > 0 && <ul>{field.rules.filter((rule) => rule.active).map((rule) => <li key={rule.ruleId}>{rule.ruleType}{rule.ruleType === 'RANGE' ? ` ${rule.ruleConfig?.min}–${rule.ruleConfig?.max}` : ''}<span>{rule.severity.toLowerCase()}</span><button className="text-button danger-text" type="button" onClick={() => deactivateRule(rule)}>Disable</button></li>)}</ul>}
+              {field.active && <div className="field-actions"><button className="text-button" type="button" onClick={() => renameField(field)}>Rename</button><button className="text-button" type="button" onClick={() => setRuleFieldId(ruleFieldId === field.fieldId ? null : field.fieldId)}>Add rule</button><button className="text-button danger-text" type="button" onClick={() => archiveField(field)}>Archive field</button></div>}
               {ruleFieldId === field.fieldId && <form className="form-stack compact-form" onSubmit={addRuleToField}><label>Rule<select name="ruleType" value={newRuleType} onChange={(event) => setNewRuleType(event.target.value)}><option value="REQUIRED">Required</option><option value="UNIQUE">Unique</option><option value="EMAIL">Email format</option><option value="RANGE">Number range</option><option value="TYPE">Field data type</option></select></label>{newRuleType === 'RANGE' && <div className="two-inputs"><label>Minimum<input name="min" type="number" step="any" required /></label><label>Maximum<input name="max" type="number" step="any" required /></label></div>}<label>Severity<select name="severity"><option>MEDIUM</option><option>LOW</option><option>HIGH</option></select></label><button className="button button-quiet">Save rule</button></form>}
             </article>)}</div>}
             <form className="form-stack compact-form" onSubmit={submitField}>
@@ -252,11 +223,7 @@ function BakyaDatasetWorkspace({ token, initialDataset, onClose, onReload, onSel
             {runResult && <div className="run-summary"><div className="run-score"><span>Overall score</span><strong>{runResult.score ? `${Number(runResult.score.overallScore).toFixed(1)}%` : '—'}</strong></div><div><span className="metric-label">Rows</span><strong>{runResult.totalRows}</strong></div><div><span className="metric-label">Issues</span><strong>{runResult.issueCount}</strong></div><button className="text-button" onClick={() => onSelectRun(runResult.runId)}>Open full run →</button></div>}
           </section>
         </div>
-        <section className="sub-panel"><div className="panel-heading"><div><h3>Validation run history</h3><p className="muted">Each run is saved separately with its own score and issues.</p></div><span className="count-tag">{dataset.runs?.length || 0} runs</span></div>
-          {!dataset.runs?.length ? <p className="small-note">No validation runs yet. Upload a CSV to create the first run.</p> : <div className="table-scroll"><table><thead><tr><th>Run</th><th>Started</th><th>Status</th><th>Rows</th><th>Issues</th><th>Score</th><th /></tr></thead><tbody>{dataset.runs.map((run) => <tr key={run.runId}><td>#{run.runId}</td><td>{run.startedAt ? new Date(run.startedAt).toLocaleString() : '—'}</td><td>{run.status}</td><td>{run.totalRows}</td><td>{run.issueCount}</td><td>{run.score ? `${Number(run.score.overallScore).toFixed(1)}%` : '—'}</td><td><button className="text-button" type="button" onClick={() => onSelectRun(run.runId)}>Open run →</button></td></tr>)}</tbody></table></div>}
-        </section>
-        {runResult?.issues?.length > 0 && <section className="sub-panel issue-panel"><div className="panel-heading"><div><h3>Latest issues</h3><p className="muted">First 100 issues from this run.</p></div></div><IssueTable issues={runResult.issues} onResolve={(issue, status) => { setResolutionError(''); setResolutionTarget({ issue, status }); }} /></section>}
-        {resolutionTarget && <BakyaResolutionDialog issue={resolutionTarget.issue} status={resolutionTarget.status} busy={resolutionBusy} error={resolutionError} onClose={() => { if (!resolutionBusy) { setResolutionTarget(null); setResolutionError(''); } }} onSubmit={saveIssueResolution} />}
+        {runResult?.issues?.length > 0 && <section className="sub-panel issue-panel"><div className="panel-heading"><div><h3>Latest issues</h3><p className="muted">First 100 issues from this run.</p></div></div><IssueTable issues={runResult.issues} onResolve={resolveIssue} /></section>}
       </section>
     </div>
   );

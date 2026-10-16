@@ -20,15 +20,12 @@ public class SeedUsers {
             @Value("${datapulse.seed.admin-email:}") String adminEmail,
             @Value("${datapulse.seed.admin-password:}") String adminPassword,
             @Value("${datapulse.seed.analyst-email:}") String analystEmail,
-            @Value("${datapulse.seed.analyst-password:}") String analystPassword,
-            @Value("${datapulse.seed.rudra-email:}") String rudraEmail,
-            @Value("${datapulse.seed.rudra-password:}") String rudraPassword) {
+            @Value("${datapulse.seed.analyst-password:}") String analystPassword) {
         return args -> {
             RoleEntity adminRole = roles.findByRoleName("ADMIN").orElseGet(() -> saveRole(roles, "ADMIN", "Manages all users and datasets."));
             RoleEntity analystRole = roles.findByRoleName("ANALYST").orElseGet(() -> saveRole(roles, "ANALYST", "Manages owned datasets and validation runs."));
-            createIfConfigured(users, passwordEncoder, adminRole, adminEmail, adminPassword, "Udiksha Agarwal (24BAI0086)");
-            createIfConfigured(users, passwordEncoder, analystRole, analystEmail, analystPassword, "Bakya (24BAI0071)");
-            createIfConfigured(users, passwordEncoder, analystRole, rudraEmail, rudraPassword, "Rudra (24BKT0125)");
+            createIfConfigured(users, passwordEncoder, adminRole, adminEmail, adminPassword, "DataPulse Admin");
+            createIfConfigured(users, passwordEncoder, analystRole, analystEmail, analystPassword, "DataPulse Analyst");
         };
     }
 
