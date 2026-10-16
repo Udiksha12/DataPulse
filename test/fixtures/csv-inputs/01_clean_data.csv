@@ -1,0 +1,6 @@
+record_id,email,attendance_pct,department
+STU101,aanya.shah@example.com,95.0,Computer Science
+STU102,rohan.mehta@example.com,82.5,Electronics
+STU103,sara.khan@example.com,76.0,Mechanical
+STU104,vivaan.rao@example.com,100.0,Civil
+STU105,myra.jain@example.com,0.0,Computer Science

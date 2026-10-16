@@ -1,0 +1,5 @@
+record_id,email,attendance_pct,department
+STU201,neel@example.com,88,Electronics
+STU202,tara@example.com,91,Civil
+STU201,arjun@example.com,72,Mechanical
+STU204,meera@example.com,84,Computer Science
