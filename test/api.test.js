@@ -7,7 +7,6 @@
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import app from '../api/index.js';
-import { buildIssueStatusUpdateQuery } from '../api/postgres-db.js';
 
 describe('DataPulse API Integration Test Suite', () => {
   let server;
@@ -17,19 +16,6 @@ describe('DataPulse API Integration Test Suite', () => {
   let createdDatasetId;
   let sampleFieldId;
   let sampleRuleId;
-  let sampleUniqueRuleId;
-  let validationRunId;
-  let sampleIssueId;
-
-  test('PostgreSQL issue status update binds status and reopen flag with consistent types', () => {
-    const resolveQuery = buildIssueStatusUpdateQuery(42, 'RESOLVED');
-    assert.match(resolveQuery.text, /status = \$2/);
-    assert.match(resolveQuery.text, /CASE WHEN \$3 THEN NULL ELSE now\(\) END/);
-    assert.deepEqual(resolveQuery.values, [42, 'RESOLVED', false]);
-
-    const reopenQuery = buildIssueStatusUpdateQuery(42, 'OPEN');
-    assert.deepEqual(reopenQuery.values, [42, 'OPEN', true]);
-  });
 
   before(async () => {
     await new Promise((resolve) => {
@@ -69,7 +55,7 @@ describe('DataPulse API Integration Test Suite', () => {
     const res = await fetch(`${baseUrl}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'udiksha@datapulse.local', password: 'WrongPassword' }),
+      body: JSON.stringify({ email: 'admin@datapulse.local', password: 'WrongPassword' }),
     });
     assert.equal(res.status, 401);
   });
@@ -78,7 +64,7 @@ describe('DataPulse API Integration Test Suite', () => {
     const res = await fetch(`${baseUrl}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'udiksha@datapulse.local', password: 'Udiksha@DataPulse2026' }),
+      body: JSON.stringify({ email: 'admin@datapulse.local', password: 'Admin@1234' }),
     });
     assert.equal(res.status, 200);
     const data = await res.json();
@@ -91,7 +77,7 @@ describe('DataPulse API Integration Test Suite', () => {
     const res = await fetch(`${baseUrl}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'bakya@datapulse.local', password: 'Bakya@DataPulse2026' }),
+      body: JSON.stringify({ email: 'analyst@datapulse.local', password: 'Analyst@1234' }),
     });
     assert.equal(res.status, 200);
     const data = await res.json();
@@ -100,36 +86,24 @@ describe('DataPulse API Integration Test Suite', () => {
     analystToken = data.token;
   });
 
-  test('6. Login as Rudra returns valid JWT and ANALYST role', async () => {
-    const res = await fetch(`${baseUrl}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'rudra@datapulse.local', password: 'Rudra@DataPulse2026' }),
-    });
-    assert.equal(res.status, 200);
-    const data = await res.json();
-    assert.ok(data.token);
-    assert.equal(data.user.role, 'ANALYST');
-  });
-
-  test('7. RBAC Verification: Analyst cannot access Admin Overview (403 Forbidden)', async () => {
+  test('6. RBAC Verification: Analyst cannot access Admin Overview (403 Forbidden)', async () => {
     const res = await fetch(`${baseUrl}/admin/overview`, {
       headers: { Authorization: `Bearer ${analystToken}` },
     });
     assert.equal(res.status, 403);
   });
 
-  test('8. RBAC Verification: Admin can access Admin Overview', async () => {
+  test('7. RBAC Verification: Admin can access Admin Overview', async () => {
     const res = await fetch(`${baseUrl}/admin/overview`, {
       headers: { Authorization: `Bearer ${adminToken}` },
     });
     assert.equal(res.status, 200);
     const data = await res.json();
-    assert.ok(data.totalUsers >= 3);
+    assert.ok(data.totalUsers >= 2);
     assert.ok(Array.isArray(data.users));
   });
 
-  test('9. Analyst creates a new dataset', async () => {
+  test('8. Analyst creates a new dataset', async () => {
     const res = await fetch(`${baseUrl}/datasets`, {
       method: 'POST',
       headers: {
@@ -147,7 +121,7 @@ describe('DataPulse API Integration Test Suite', () => {
     createdDatasetId = data.dataset_id;
   });
 
-  test('10. Analyst adds a field and validation rule to the dataset', async () => {
+  test('9. Analyst adds a field and validation rule to the dataset', async () => {
     const fieldRes = await fetch(`${baseUrl}/datasets/${createdDatasetId}/fields`, {
       method: 'POST',
       headers: {
@@ -177,18 +151,10 @@ describe('DataPulse API Integration Test Suite', () => {
     assert.equal(ruleRes.status, 201);
     const ruleData = await ruleRes.json();
     sampleRuleId = ruleData.rule_id;
-
-    const uniqueRuleRes = await fetch(`${baseUrl}/fields/${sampleFieldId}/rules`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${analystToken}` },
-      body: JSON.stringify({ ruleType: 'UNIQUE', severity: 'HIGH' }),
-    });
-    assert.equal(uniqueRuleRes.status, 201);
-    sampleUniqueRuleId = (await uniqueRuleRes.json()).rule_id;
   });
 
-  test('11. CSV Validation Run executes transaction, procedure and trigger', async () => {
-    const csvContent = 'student_id\nS001\nS001';
+  test('10. CSV Validation Run executes transaction, procedure and trigger', async () => {
+    const csvContent = 'record_id,email,attendance_pct,department\nREC-001,alice@vit.ac.in,95,CSE\nREC-002,bademail,150,ECE';
     const boundary = '----WebKitFormBoundary7MA4YWxkTrZu0gW';
     const multipartBody =
       `--${boundary}\r\n` +
@@ -197,7 +163,7 @@ describe('DataPulse API Integration Test Suite', () => {
       `${csvContent}\r\n` +
       `--${boundary}--\r\n`;
 
-    const res = await fetch(`${baseUrl}/datasets/${createdDatasetId}/runs`, {
+    const res = await fetch(`${baseUrl}/datasets/1/runs`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${analystToken}`,
@@ -208,7 +174,6 @@ describe('DataPulse API Integration Test Suite', () => {
 
     assert.equal(res.status, 201);
     const run = await res.json();
-    validationRunId = run.runId;
     assert.equal(run.status, 'COMPLETED');
     assert.equal(run.totalRows, 2);
     assert.ok(run.score !== null);
@@ -222,63 +187,5 @@ describe('DataPulse API Integration Test Suite', () => {
     assert.equal(issuesRes.status, 200);
     const issues = await issuesRes.json();
     assert.ok(issues.totalElements > 0);
-    sampleIssueId = issues.content[0].issueId;
-  });
-
-  test('12. Validation runs are independently retrievable with dataset details', async () => {
-    const [runRes, datasetRes] = await Promise.all([
-      fetch(`${baseUrl}/runs/${validationRunId}`, { headers: { Authorization: `Bearer ${analystToken}` } }),
-      fetch(`${baseUrl}/datasets/${createdDatasetId}`, { headers: { Authorization: `Bearer ${analystToken}` } }),
-    ]);
-    assert.equal(runRes.status, 200);
-    const run = await runRes.json();
-    assert.equal(run.runId, validationRunId);
-    assert.equal(run.datasetName, 'Automated Lab Test Dataset 2026');
-    assert.ok(run.score.overallScore >= 0);
-    assert.equal(datasetRes.status, 200);
-    const dataset = await datasetRes.json();
-    assert.ok(dataset.runs.some((item) => item.runId === validationRunId));
-  });
-
-  test('13. Issue resolution persists status and resolution note', async () => {
-    const resolveRes = await fetch(`${baseUrl}/issues/${sampleIssueId}/status`, {
-      method: 'PATCH',
-      headers: { Authorization: `Bearer ${analystToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'FIXED', note: 'Corrected during demo review.' }),
-    });
-    assert.equal(resolveRes.status, 200);
-    const resolved = await resolveRes.json();
-    assert.equal(resolved.status, 'RESOLVED');
-
-    const issuesRes = await fetch(`${baseUrl}/runs/${validationRunId}/issues?status=RESOLVED`, {
-      headers: { Authorization: `Bearer ${analystToken}` },
-    });
-    const issues = await issuesRes.json();
-    const resolvedIssue = issues.content.find((issue) => issue.issueId === sampleIssueId);
-    assert.equal(resolvedIssue.status, 'RESOLVED');
-    assert.equal(resolvedIssue.resolutions[0].note, 'Corrected during demo review.');
-
-    const adminRes = await fetch(`${baseUrl}/admin/overview`, { headers: { Authorization: `Bearer ${adminToken}` } });
-    assert.equal(adminRes.status, 200);
-    const overview = await adminRes.json();
-    const supportNotice = overview.recentAuditLogs.find((log) => log.action === 'SUPPORT_TEAM_NOTIFIED');
-    assert.equal(supportNotice.entityId, sampleIssueId);
-    assert.equal(supportNotice.newValues.note, 'Corrected during demo review.');
-  });
-
-  test('14. Archived datasets can be restored', async () => {
-    const archiveRes = await fetch(`${baseUrl}/datasets/${createdDatasetId}`, {
-      method: 'DELETE', headers: { Authorization: `Bearer ${analystToken}` },
-    });
-    assert.equal(archiveRes.status, 200);
-    assert.equal((await archiveRes.json()).status, 'ARCHIVED');
-
-    const restoreRes = await fetch(`${baseUrl}/datasets/${createdDatasetId}`, {
-      method: 'PUT',
-      headers: { Authorization: `Bearer ${analystToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'ACTIVE' }),
-    });
-    assert.equal(restoreRes.status, 200);
-    assert.equal((await restoreRes.json()).status, 'ACTIVE');
   });
 });

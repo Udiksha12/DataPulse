@@ -27,12 +27,10 @@ datapulse:
   cors:
     origin: ${DATAPULSE_CORS_ORIGIN:http://localhost:5173}
   seed:
-    admin-email: ${DATAPULSE_SEED_ADMIN_EMAIL:udiksha@datapulse.local}
+    admin-email: ${DATAPULSE_SEED_ADMIN_EMAIL:}
     admin-password: ${DATAPULSE_SEED_ADMIN_PASSWORD:}
-    analyst-email: ${DATAPULSE_SEED_ANALYST_EMAIL:bakya@datapulse.local}
+    analyst-email: ${DATAPULSE_SEED_ANALYST_EMAIL:}
     analyst-password: ${DATAPULSE_SEED_ANALYST_PASSWORD:}
-    rudra-email: ${DATAPULSE_SEED_RUDRA_EMAIL:rudra@datapulse.local}
-    rudra-password: ${DATAPULSE_SEED_RUDRA_PASSWORD:}
 
 logging:
   level:

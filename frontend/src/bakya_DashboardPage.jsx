@@ -26,9 +26,9 @@ export default function BakyaDashboardPage({ token, onOpenDataset }) {
         <span className="live-pill"><i /> Workspace ready</span>
       </div>
       <section className="metric-grid">
-        <article className="metric-card"><span className="metric-label">Datasets</span><strong>{summary.totalDatasets ?? 0}</strong><small>Registered in your workspace</small></article>
-        <article className="metric-card"><span className="metric-label">Open issues</span><strong>{summary.openIssues ?? 0}</strong><small>Need review or resolution</small></article>
-        <article className="metric-card"><span className="metric-label">Average quality</span><strong>{summary.averageQualityScore == null ? '—' : Number(summary.averageQualityScore).toFixed(1)}<em>/100</em></strong><small>{summary.completedRuns ? 'Across completed runs' : 'Run a validation to see a score'}</small></article>
+        <article className="metric-card"><span className="metric-label">Datasets</span><strong>{summary.datasetCount}</strong><small>Registered in your workspace</small></article>
+        <article className="metric-card"><span className="metric-label">Open issues</span><strong>{summary.openIssueCount}</strong><small>Need review or resolution</small></article>
+        <article className="metric-card"><span className="metric-label">Average quality</span><strong>{Number(summary.averageScore || 0).toFixed(1)}<em>/100</em></strong><small>Across completed runs</small></article>
       </section>
       <section className="panel">
         <div className="panel-heading"><div><h2>Dataset health</h2><p className="muted">Most recent completed run for each dataset</p></div><span className="count-tag">{summary.datasets?.length || 0} total</span></div>
@@ -36,7 +36,7 @@ export default function BakyaDashboardPage({ token, onOpenDataset }) {
           <div className="table-scroll"><table><thead><tr><th>Dataset</th><th>Status</th><th>Latest score</th><th>Open issues</th><th /></tr></thead>
             <tbody>{summary.datasets.map((dataset) => <tr key={dataset.datasetId}>
               <td><strong>{dataset.datasetName}</strong><small className="table-sub">ID {dataset.datasetId}</small></td>
-              <td><span className={`status-pill ${dataset.datasetStatus === 'ACTIVE' ? 'status-active' : 'status-archived'}`}>{dataset.datasetStatus}</span></td>
+              <td><span className={`status-pill ${dataset.status === 'ACTIVE' ? 'status-active' : 'status-archived'}`}>{dataset.status}</span></td>
               <td><span className={`score-chip ${scoreTone(dataset.latestOverallScore)}`}>{dataset.latestOverallScore == null ? 'No run' : `${Number(dataset.latestOverallScore).toFixed(1)}%`}</span></td>
               <td>{dataset.openIssueCount}</td>
               <td><button className="text-button" onClick={() => onOpenDataset(dataset.datasetId)}>Open →</button></td>
