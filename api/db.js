@@ -13,28 +13,14 @@
  */
 
 import bcrypt from 'bcryptjs';
-import pg from 'pg';
+import { postgresDb } from './postgres-db.js';
 import { printUdiksha24BAI0086Identity } from '../backend/identity/udiksha24BAI0086.js';
 import { printRudra24BKT0125Identity } from '../backend/identity/rudra24BKT0125.js';
 
 printUdiksha24BAI0086Identity();
 printRudra24BKT0125Identity();
 
-const { Pool } = pg;
 const dbUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL || null;
-
-let pool = null;
-if (dbUrl) {
-  try {
-    pool = new Pool({
-      connectionString: dbUrl,
-      ssl: { rejectUnauthorized: false },
-    });
-    console.info('[DataPulse DB] Connected to Cloud PostgreSQL instance.');
-  } catch (err) {
-    console.warn('[DataPulse DB] Could not connect to DATABASE_URL, using fallback store:', err.message);
-  }
-}
 
 // -----------------------------------------------------------------------------
 // Relational In-Memory Store (Mirrors PostgreSQL 10-table 3NF schema exactly)
@@ -137,8 +123,8 @@ const store = {
 // Database Operations & Helper Functions
 // -----------------------------------------------------------------------------
 
-export const db = {
-  isCloudConnected: () => !!pool,
+const memoryDb = {
+  isCloudConnected: () => false,
 
   // --- USERS & AUTH ---
   findUserByEmail: async (email) => {
@@ -730,3 +716,9 @@ export const db = {
     };
   },
 };
+
+// Use the persistent PostgreSQL adapter whenever a cloud/local connection URL
+// is configured. The in-memory store is only the no-database development fallback.
+export const db = dbUrl
+  ? { ...postgresDb, isCloudConnected: () => true }
+  : memoryDb;

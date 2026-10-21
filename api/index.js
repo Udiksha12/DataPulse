@@ -38,7 +38,16 @@ const router = express.Router();
 // -----------------------------------------------------------------------------
 // Health, Metrics & Student Identity Endpoints
 // -----------------------------------------------------------------------------
-router.get('/health', (req, res) => {
+router.get('/health', async (req, res) => {
+  try {
+    if (db.isCloudConnected()) await db.healthCheck();
+  } catch {
+    return res.status(503).json({
+      status: 'DOWN',
+      database: 'Cloud PostgreSQL Unavailable',
+      timestamp: new Date().toISOString(),
+    });
+  }
   res.json({
     status: 'UP',
     database: db.isCloudConnected() ? 'Cloud PostgreSQL Connected' : 'In-Memory Relational Engine (3NF)',
