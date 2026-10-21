@@ -173,7 +173,7 @@ npx vercel
 3. Import the `datapulse` repository.
 4. Set Environment Variables in the Vercel dashboard:
    - `JWT_SECRET`: Any random 32-character string.
-   - `DATABASE_URL` *(Optional)*: Your Cloud PostgreSQL connection URI (e.g. from Supabase / Neon / Railway).
+   - `DATABASE_URL` or `POSTGRES_URL`: Your Cloud PostgreSQL connection URI (e.g. from Supabase / Neon / Railway). Configure this for persistent cloud data; without it, the app uses its in-memory fallback.
 5. Click **Deploy**. Vercel will build the React frontend and deploy the serverless API routes under `/api`.
 6. Access your **Live URL**: `https://datapulse-[unique-id].vercel.app`.
 
@@ -207,14 +207,30 @@ chmod +x ./clouddatabase/backup.sh ./clouddatabase/restore.sh
 
 ## 8. Demo Walkthrough with Credentials
 
-### Default User Credentials
+### Deployed Demo Accounts
 | Role | Email Address | Password | Permissions |
 |---|---|---|---|
-| **ADMIN** | `admin@datapulse.local` | `Admin@1234` | Full access: View all datasets, inspect system metrics, manage all data |
-| **ANALYST** | `analyst@datapulse.local` | `Analyst@1234` | Restricted access: Manage owned datasets, upload CSVs, resolve issues |
+| **ADMIN** | `udiksha@datapulse.local` | Configured privately in Vercel for the one-time reset described below | Full access: View all datasets, inspect system metrics, manage all data |
+| **ANALYST** | `bakya@datapulse.local` | Configured privately in Vercel for the one-time reset described below | Restricted access: Manage owned datasets, upload CSVs, resolve issues |
+
+Do not put deployed account passwords in this README, source code, or Git history. The local in-memory demo store has separate fallback credentials and is not the persistent Vercel/Supabase account store.
+
+### One-time reset for the existing Supabase demo accounts
+
+The PostgreSQL adapter contains a one-time migration for the two deployed accounts. It creates BCrypt hashes, updates the matching Supabase `users` rows, reactivates those demo accounts, and records a migration marker in `audit_logs`. The marker prevents future serverless starts from overwriting passwords again.
+
+To run it on the live deployment:
+
+1. In Vercel, open **DataPulse → Settings → Environment Variables**.
+2. Add `DATAPULSE_RESET_ADMIN_PASSWORD` and `DATAPULSE_RESET_ANALYST_PASSWORD` for the **Production** environment. Enter each account's intended password directly in Vercel; do not commit the values.
+3. Redeploy the latest `main` deployment so the new variables are available to the serverless API.
+4. Sign in at the production URL. The first API login request initializes the database and applies the reset; then sign in with both accounts to verify them.
+5. Once both logins work, delete the two temporary reset variables from Vercel and redeploy. The database marker keeps the completed reset in place.
+
+If the migration marker already exists, changing these variables will not reset the accounts again. For a later password change, use a separate secure password-reset process rather than reusing this one-time migration.
 
 ### Demonstration Steps:
-1. **Login as Analyst**: Sign in with `analyst@datapulse.local`.
+1. **Login as Analyst**: Sign in with `bakya@datapulse.local` and the password configured for the deployed account.
 2. **Review Default Dataset**: Open *"Student Attendance & Performance 2026"*.
 3. **Inspect Fields & Validation Rules**:
    - `record_id`: Rules = `REQUIRED`, `UNIQUE`
@@ -231,7 +247,7 @@ chmod +x ./clouddatabase/backup.sh ./clouddatabase/restore.sh
    - Click **Resolve**, choose action `FIXED`, enter a note, and submit.
    - Confirm audit trail creation in `audit_logs`.
 7. **Switch to Admin Account**:
-   - Sign in with `admin@datapulse.local`.
+   - Sign in with `udiksha@datapulse.local` and the password configured for the deployed account.
    - Open **Admin Overview** (`/admin`) to verify cross-system analytics, user rosters, and audit logs.
 
 ---
