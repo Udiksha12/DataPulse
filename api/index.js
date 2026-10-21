@@ -134,13 +134,22 @@ router.get('/admin/overview', requireAuth, requireAdmin, async (req, res) => {
 router.get('/datasets', requireAuth, async (req, res) => {
   try {
     const { q, status } = req.query;
+    const page = Math.max(0, Number.parseInt(req.query.page, 10) || 0);
+    const size = Math.min(100, Math.max(1, Number.parseInt(req.query.size, 10) || 8));
     const datasets = await db.getDatasets({
       userId: req.user.userId,
       role: req.user.role,
       search: q,
       status,
     });
-    res.json(datasets);
+    const totalElements = datasets.length;
+    res.json({
+      content: datasets.slice(page * size, (page + 1) * size),
+      totalElements,
+      totalPages: Math.ceil(totalElements / size),
+      page,
+      size,
+    });
   } catch (err) {
     res.status(err.status || 500).json({ message: err.message });
   }

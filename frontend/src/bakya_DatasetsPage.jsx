@@ -74,7 +74,7 @@ export default function BakyaDatasetsPage({ token, openDatasetId, onDatasetOpene
           <div className="table-scroll"><table><thead><tr><th>Dataset</th><th>Fields</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead><tbody>
             {pageData.content.map((dataset) => <tr key={dataset.datasetId}>
               <td><button className="table-link" onClick={() => setSelected(dataset)}>{dataset.datasetName}</button><small className="table-sub">{dataset.description || `Dataset ${dataset.datasetId}`}</small></td>
-              <td>{dataset.fields?.length || 0}</td><td><span className={`status-pill ${dataset.status === 'ACTIVE' ? 'status-active' : 'status-archived'}`}>{dataset.status}</span></td>
+              <td>{dataset.fieldCount ?? dataset.fields?.length ?? 0}</td><td><span className={`status-pill ${dataset.status === 'ACTIVE' ? 'status-active' : 'status-archived'}`}>{dataset.status}</span></td>
               <td>{dataset.createdAt ? new Date(dataset.createdAt).toLocaleDateString() : '—'}</td>
               <td className="row-actions"><button className="text-button" onClick={() => setSelected(dataset)}>Configure</button>{dataset.status === 'ACTIVE' && <button className="text-button danger-text" onClick={() => archive(dataset)}>Archive</button>}</td>
             </tr>)}
