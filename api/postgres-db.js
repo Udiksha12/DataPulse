@@ -13,6 +13,7 @@ const pool = connectionString ? new Pool({
 }) : null;
 
 const demoDatasetName = 'Student Attendance & Performance 2026';
+const demoCredentialMigration = 'DEMO_CREDENTIALS_RESET_20261021';
 let initialization;
 
 function fail(message, status = 400) {
@@ -65,6 +66,39 @@ async function initialize() {
       }
       if (!result.rowCount) throw new Error(`Unable to create or find demo account ${email}.`);
       userIds[email] = Number(result.rows[0].user_id);
+    }
+
+    // Reset the two requested live demo credentials once. The audit row is a
+    // durable migration marker so future serverless cold starts never replace
+    // passwords that users change later. Never write password material to logs.
+    const credentialMigration = await client.query(
+      `SELECT 1 FROM audit_logs
+        WHERE entity_type = 'SYSTEM_MIGRATION' AND entity_id = 0 AND action = $1
+        LIMIT 1`,
+      [demoCredentialMigration],
+    );
+    const resetAdminPassword = process.env.DATAPULSE_RESET_ADMIN_PASSWORD;
+    const resetAnalystPassword = process.env.DATAPULSE_RESET_ANALYST_PASSWORD;
+    if (!credentialMigration.rowCount && resetAdminPassword && resetAnalystPassword) {
+      const credentialResets = [
+        { email: 'udiksha@datapulse.local', password: resetAdminPassword },
+        { email: 'bakya@datapulse.local', password: resetAnalystPassword },
+      ];
+      for (const credential of credentialResets) {
+        const passwordHash = await bcrypt.hash(credential.password, 10);
+        const updated = await client.query(
+          `UPDATE users
+              SET password_hash = $2, is_active = true, updated_at = now()
+            WHERE lower(email) = $1`,
+          [credential.email, passwordHash],
+        );
+        if (!updated.rowCount) throw new Error(`Unable to reset demo account ${credential.email}.`);
+      }
+      await client.query(
+        `INSERT INTO audit_logs (actor_user_id, entity_type, entity_id, action, old_values, new_values)
+         VALUES (NULL, 'SYSTEM_MIGRATION', 0, $1, '{}'::jsonb, $2::jsonb)`,
+        [demoCredentialMigration, JSON.stringify({ accounts: ['udiksha@datapulse.local', 'bakya@datapulse.local'] })],
+      );
     }
 
     const bakyaEmail = (process.env.DATAPULSE_SEED_ANALYST_EMAIL || 'bakya@datapulse.local').trim().toLowerCase();
